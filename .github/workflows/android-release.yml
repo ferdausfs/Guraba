@@ -35,6 +35,20 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      # Flutter আগে setup করতে হবে — কারণ settings.gradle এ flutter.sdk দরকার
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # local.properties CI-তে থাকে না (gitignored), তাই তৈরি করতে হবে
+      - name: Create android/local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT"   > android/local.properties
+          echo "flutter.sdk=$FLUTTER_ROOT"  >> android/local.properties
+
+      # gradlew repo-তে নেই (gitignored), CI-তে generate করতে হবে
       - name: Generate Gradle wrapper
         working-directory: android
         run: |
@@ -44,12 +58,6 @@ jobs:
           fi
           chmod +x gradlew
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
       - name: Resolve app version
         id: version
         shell: bash
@@ -57,28 +65,28 @@ jobs:
           VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
           VERSION_NAME=${VERSION%%+*}
           VERSION_CODE=${VERSION##*+}
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION"               >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME"     >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE"     >> "$GITHUB_OUTPUT"
 
-      # Fix: secrets কে env-এ pass করে shell-এ check করো
-      # GitHub Actions এ if: condition এ secrets.XXX সরাসরি কাজ করে না
+      # GitHub Actions if: condition এ secrets.XXX কাজ করে না
+      # তাই secrets কে env-এ pass করে shell-এ check করি
       - name: Prepare Android signing
         shell: bash
         env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_B64:    ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           _STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-          _KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          _KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          _KEY_ALIAS:      ${{ secrets.ANDROID_KEY_ALIAS }}
+          _KEY_PASSWORD:   ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_B64" ]; then
             echo "Keystore found — setting up release signing..."
             KEYSTORE_PATH="$RUNNER_TEMP/release-keystore.jks"
             echo "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
-            echo "KEYSTORE_FILE=$KEYSTORE_PATH"      >> "$GITHUB_ENV"
-            echo "STORE_PASSWORD=$_STORE_PASSWORD"   >> "$GITHUB_ENV"
-            echo "KEY_ALIAS=$_KEY_ALIAS"             >> "$GITHUB_ENV"
-            echo "KEY_PASSWORD=$_KEY_PASSWORD"       >> "$GITHUB_ENV"
+            echo "KEYSTORE_FILE=$KEYSTORE_PATH"    >> "$GITHUB_ENV"
+            echo "STORE_PASSWORD=$_STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$_KEY_ALIAS"           >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$_KEY_PASSWORD"     >> "$GITHUB_ENV"
           else
             echo "No keystore — falling back to debug signing."
           fi

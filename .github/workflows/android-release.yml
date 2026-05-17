@@ -1,0 +1,131 @@
+name: Android APK Build & Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve app version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          VERSION_NAME=${VERSION%%+*}
+          VERSION_CODE=${VERSION##*+}
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Android signing
+        id: signing
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        shell: bash
+        run: |
+          KEYSTORE_PATH="$RUNNER_TEMP/release-keystore.jks"
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > "$KEYSTORE_PATH"
+          echo "KEYSTORE_FILE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+          echo "STORE_PASSWORD=${{ secrets.ANDROID_STORE_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+      - name: Mark unsigned fallback mode
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 == '' }}
+        shell: bash
+        run: echo "CI is running without release keystore; Gradle will use debug-sign fallback for release verification."
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze
+
+      - name: Build split release APKs
+        run: flutter build apk --release --split-per-abi
+
+      - name: Build release app bundle
+        run: flutter build appbundle --release
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          rm -rf release-assets
+          mkdir -p release-assets
+          cp build/app/outputs/flutter-apk/*.apk release-assets/
+          cp build/app/outputs/bundle/release/*.aab release-assets/
+          (cd release-assets && sha256sum * > SHA256SUMS.txt)
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: guraba-android-${{ steps.version.outputs.version_name }}-${{ steps.version.outputs.version_code }}
+          path: release-assets/*
+          if-no-files-found: error
+
+      - name: Move rolling release tag
+        if: ${{ github.event_name != 'pull_request' }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -fa auto-build -m "Automated build for ${GITHUB_SHA}"
+          git push origin refs/tags/auto-build --force
+
+      - name: Publish rolling GitHub release
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          artifacts: release-assets/*
+          artifactErrorsFailBuild: true
+          generateReleaseNotes: true
+          name: Guraba Auto Build
+          prerelease: true
+          removeArtifacts: true
+          replacesArtifacts: true
+          tag: auto-build
+          body: |
+            Automated rolling Android release for Guraba.
+
+            - Branch: `${{ github.ref_name }}`
+            - Commit: `${{ github.sha }}`
+            - Version: `${{ steps.version.outputs.version }}`
+            - Signing secrets configured: `${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}`
+
+            Release assets include split APKs, the Play Store AAB, and SHA256 checksums.

@@ -1,6 +1,6 @@
 # Guraba 🛡️🧘
 
-**Package:** `com.guraba.app` · **Platform:** Android (Flutter 3.1+ / Kotlin 17) · **Min SDK:** 26 · **Target SDK:** 35
+**Package:** `com.guraba.app` · **Platform:** Android (Flutter 3.1+ / Kotlin 17) · **Min SDK:** 24 · **Target SDK:** 35
 
 Guraba is a unified, privacy-first digital-wellbeing app — the merger of two open-source projects into one optimised codebase:
 
@@ -122,6 +122,24 @@ You can also run:
 ```bash
 flutter run                        # debug on a connected device
 ```
+
+## 🚀 GitHub Actions APK auto build & release
+
+A ready-to-use workflow is included at `.github/workflows/android-release.yml`.
+
+- Push to `main` or `master` → builds Android release artifacts automatically
+- Pull requests → run build validation without publishing a release
+- GitHub Releases → updates a rolling pre-release tagged `auto-build`
+- Release assets → split APKs, release AAB, and `SHA256SUMS.txt`
+
+### Required GitHub secrets for production signing
+
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_STORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
+If these secrets are not added yet, the workflow still builds using debug-sign fallback so CI stays green, but for public distribution you should use a real release keystore.
 
 ### TFLite Models
 

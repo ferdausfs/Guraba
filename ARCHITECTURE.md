@@ -48,9 +48,10 @@ full Dart-side surface (PIN, AI settings, models, keyword rules, block log).
 
 ## Build outputs
 
-- `flutter build apk --release` → `build/app/outputs/flutter-apk/app-release.apk`
+- `flutter build apk --release --split-per-abi` → `build/app/outputs/flutter-apk/*.apk`
 - `flutter build appbundle --release` → `build/app/outputs/bundle/release/app-release.aab`
+- `.github/workflows/android-release.yml` → automatic CI build + rolling GitHub pre-release (`auto-build`)
 
-R8/ProGuard rules from upstream Mindful are kept; the TFLite GPU delegate
-requires `-keep class org.tensorflow.lite.gpu.** { *; }` which is already
-present in Mindful's `proguard-rules.pro`.
+R8/ProGuard rules from upstream Mindful are kept and extended for TensorFlow Lite.
+The GPU delegate requires `-keep class org.tensorflow.lite.gpu.** { *; }`,
+which is now explicitly present in `android/app/proguard-rules.pro`.

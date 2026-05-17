@@ -47,3 +47,11 @@ app.*.map.json
 /android/app/release
 /android/app/.cxx/
 /android/build
+
+# Android signing / local secrets
+*.jks
+*.keystore
+key.properties
+android/key.properties
+.env
+.env.*

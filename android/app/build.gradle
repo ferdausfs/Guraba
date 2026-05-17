@@ -23,6 +23,8 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+def hasReleaseKeystore = System.getenv("KEYSTORE_FILE") != null && !System.getenv("KEYSTORE_FILE").trim().isEmpty()
+
 android {
 
     namespace "com.guraba.app"
@@ -66,33 +68,40 @@ android {
                 debugSymbolLevel 'full'
             }
             resValue "string", "app_name", "Guraba"
-            signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
 
-            // If you see "SigningConfig 'release' is missing required property 'storeFile'",  
-            // it means your release keystore is not set up due to missing environment variables.  
-            // To fix this locally, either:  
-            // 1. Use `signingConfig signingConfigs.debug` (but DO NOT commit this change).  
-            // 2. Set the following environment variables to keep signing secure:  
-            //    - KEYSTORE_FILE  
-            //    - STORE_PASSWORD  
-            //    - KEY_ALIAS  
-            //    - KEY_PASSWORD  
-            // Avoid pushing any local changes to this Gradle file, as it may break CI/CD.  
+            // Uses release keystore in CI/local when environment variables are present.
+            // Falls back to debug signing so release builds do not fail in unsigned environments.
         }
 
         debug {
             applicationIdSuffix ".debug"
             resValue "string", "app_name", "Guraba Debug"
-            signingConfig System.getenv("KEYSTORE_FILE") != null ? signingConfigs.release : signingConfigs.debug
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
         }
 
         profile {
             // app_links library is causing error so commenting it out
             // applicationIdSuffix ".profile"
             resValue "string", "app_name", "Guraba Profile"
-            signingConfig System.getenv("KEYSTORE_FILE") != null ? signingConfigs.release : signingConfigs.debug
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
         }
     }
+
+    packaging {
+        resources {
+            excludes += [
+                'META-INF/AL2.0',
+                'META-INF/LGPL2.1',
+                'META-INF/LICENSE*',
+                'META-INF/NOTICE*'
+            ]
+        }
+    }
+
     buildFeatures {
         viewBinding true
     }

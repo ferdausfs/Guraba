@@ -58,7 +58,7 @@ class GuardianMethodHandler(
                     "aiEnabled"        to GuardianModule.aiDetector.cachedAiEnabled,
                     "userGender"       to GuardianModule.aiDetector.cachedUserGender,
                     "aiThreshold"      to GuardianModule.aiDetector.cachedThreshold,
-                    "nsfwGateThreshold"to GuardianModule.aiDetector.cachedNsfwGateThreshold,
+                    "nsfwGateThreshold" to GuardianModule.aiDetector.cachedNsfwGateThreshold,
                     "genderThreshold"  to GuardianModule.aiDetector.cachedGenderThreshold,
                     "gridVoteCount"    to GuardianModule.aiDetector.cachedGridVoteCount
                 )

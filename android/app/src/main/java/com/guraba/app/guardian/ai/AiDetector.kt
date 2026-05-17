@@ -102,10 +102,12 @@ class AiDetector(
         }
     }
 
-    private fun tryLoad(name: String): Interpreter? = try {
-        val buffer = loadModelBuffer(name) ?: return null
-        buildInterpreter(buffer)
-    } catch (_: Throwable) { null }
+    private fun tryLoad(name: String): Interpreter? {
+        return try {
+            val buffer = loadModelBuffer(name) ?: return null
+            buildInterpreter(buffer)
+        } catch (_: Throwable) { null }
+    }
 
     private fun loadModelBuffer(name: String): ByteBuffer? {
         val f = File(context.filesDir, name)

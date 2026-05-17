@@ -16,13 +16,16 @@ class DeviceInfoModel {
     required this.mindfulVersion,
   });
 
+  /// Alias for [mindfulVersion] after app rename to Guraba
+  String get gurabaVersion => mindfulVersion;
+
   factory DeviceInfoModel.fromMap(Map<String, dynamic> map) {
     return DeviceInfoModel(
       manufacturer: map['manufacturer'] ?? '',
       model: map['model'] ?? '',
       androidVersion: map['androidVersion'] ?? '',
       sdkVersion: map['sdkVersion'] ?? 24,
-      mindfulVersion: map['mindfulVersion'] ?? '',
+      mindfulVersion: map['mindfulVersion'] ?? map['gurabaVersion'] ?? '',
     );
   }
 }

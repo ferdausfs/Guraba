@@ -39,7 +39,7 @@ jobs:
         working-directory: android
         run: |
           if [ ! -f gradlew ]; then
-            echo "gradlew not found — generating from wrapper properties..."
+            echo "gradlew not found — generating..."
             gradle wrapper --gradle-version 8.14.2
           fi
           chmod +x gradlew
@@ -61,23 +61,27 @@ jobs:
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
           echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
 
+      # Fix: secrets কে env-এ pass করে shell-এ check করো
+      # GitHub Actions এ if: condition এ secrets.XXX সরাসরি কাজ করে না
       - name: Prepare Android signing
-        id: signing
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
         shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          _STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          _KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          _KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          KEYSTORE_PATH="$RUNNER_TEMP/release-keystore.jks"
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > "$KEYSTORE_PATH"
-          echo "KEYSTORE_FILE=$KEYSTORE_PATH" >> "$GITHUB_ENV"
-          echo "STORE_PASSWORD=${{ secrets.ANDROID_STORE_PASSWORD }}" >> "$GITHUB_ENV"
-          echo "KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
-          echo "KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
-          echo "enabled=true" >> "$GITHUB_OUTPUT"
-
-      - name: Mark unsigned fallback mode
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 == '' }}
-        shell: bash
-        run: echo "CI is running without release keystore; Gradle will use debug-sign fallback for release verification."
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "Keystore found — setting up release signing..."
+            KEYSTORE_PATH="$RUNNER_TEMP/release-keystore.jks"
+            echo "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+            echo "KEYSTORE_FILE=$KEYSTORE_PATH"      >> "$GITHUB_ENV"
+            echo "STORE_PASSWORD=$_STORE_PASSWORD"   >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$_KEY_ALIAS"             >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$_KEY_PASSWORD"       >> "$GITHUB_ENV"
+          else
+            echo "No keystore — falling back to debug signing."
+          fi
 
       - name: Install Flutter dependencies
         run: flutter pub get
@@ -108,7 +112,7 @@ jobs:
           if-no-files-found: error
 
       - name: Move rolling release tag
-        if: ${{ github.event_name != 'pull_request' }}
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
@@ -117,7 +121,7 @@ jobs:
           git push origin refs/tags/auto-build --force
 
       - name: Publish rolling GitHub release
-        if: ${{ github.event_name != 'pull_request' }}
+        if: github.event_name != 'pull_request'
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
@@ -135,6 +139,5 @@ jobs:
             - Branch: `${{ github.ref_name }}`
             - Commit: `${{ github.sha }}`
             - Version: `${{ steps.version.outputs.version }}`
-            - Signing secrets configured: `${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}`
 
             Release assets include split APKs, the Play Store AAB, and SHA256 checksums.

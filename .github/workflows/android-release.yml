@@ -33,29 +33,33 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
-      # Flutter আগে setup করতে হবে — কারণ settings.gradle এ flutter.sdk দরকার
+      # Flutter আগে setup — settings.gradle এ flutter.sdk দরকার
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      # local.properties CI-তে থাকে না (gitignored), তাই তৈরি করতে হবে
+      # local.properties CI-তে থাকে না (gitignored)
       - name: Create android/local.properties
         run: |
-          echo "sdk.dir=$ANDROID_SDK_ROOT"   > android/local.properties
-          echo "flutter.sdk=$FLUTTER_ROOT"  >> android/local.properties
+          echo "sdk.dir=$ANDROID_SDK_ROOT"  > android/local.properties
+          echo "flutter.sdk=$FLUTTER_ROOT" >> android/local.properties
 
-      # gradlew repo-তে নেই (gitignored), CI-তে generate করতে হবে
+      # System Gradle 9.x project-এর সাথে incompatible
+      # তাই সঠিক version (8.14.2) আলাদাভাবে install করতে হবে
+      - name: Setup Gradle 8.14.2
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.2"
+          cache-read-only: false
+
+      # gradlew repo-তে নেই (gitignored) — Gradle 8.14.2 দিয়ে generate করো
       - name: Generate Gradle wrapper
         working-directory: android
         run: |
-          if [ ! -f gradlew ]; then
-            echo "gradlew not found — generating..."
-            gradle wrapper --gradle-version 8.14.2
-          fi
+          gradle wrapper
           chmod +x gradlew
 
       - name: Resolve app version
@@ -65,12 +69,11 @@ jobs:
           VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
           VERSION_NAME=${VERSION%%+*}
           VERSION_CODE=${VERSION##*+}
-          echo "version=$VERSION"               >> "$GITHUB_OUTPUT"
-          echo "version_name=$VERSION_NAME"     >> "$GITHUB_OUTPUT"
-          echo "version_code=$VERSION_CODE"     >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION"           >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
 
-      # GitHub Actions if: condition এ secrets.XXX কাজ করে না
-      # তাই secrets কে env-এ pass করে shell-এ check করি
+      # GitHub Actions if: এ secrets.XXX চলে না — env দিয়ে pass করো
       - name: Prepare Android signing
         shell: bash
         env:

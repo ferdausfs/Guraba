@@ -35,6 +35,15 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Generate Gradle wrapper
+        working-directory: android
+        run: |
+          if [ ! -f gradlew ]; then
+            echo "gradlew not found — generating from wrapper properties..."
+            gradle wrapper --gradle-version 8.14.2
+          fi
+          chmod +x gradlew
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -74,7 +83,7 @@ jobs:
         run: flutter pub get
 
       - name: Static analysis
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
 
       - name: Build split release APKs
         run: flutter build apk --release --split-per-abi

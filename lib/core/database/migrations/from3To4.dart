@@ -24,14 +24,14 @@ Future<void> from3To4(Migrator m, Schema4 schema) async => await runSafe(
 
         /// Add usage history weeks column to [GurabaSettingsTable]
         await m.addColumn(
-          schema.gurabaSettingsTable,
-          schema.gurabaSettingsTable.usageHistoryWeeks,
+          schema.mindfulSettingsTable,
+          schema.mindfulSettingsTable.usageHistoryWeeks,
         );
 
         /// Add app version column to [GurabaSettingsTable]
         await m.addColumn(
-          schema.gurabaSettingsTable,
-          schema.gurabaSettingsTable.appVersion,
+          schema.mindfulSettingsTable,
+          schema.mindfulSettingsTable.appVersion,
         );
 
         /// Move values from [GurabaSettingsTable] and [InvincibleModeTable]  to [ParentalControlsTable]
@@ -100,7 +100,7 @@ Future<void> from3To4(Migrator m, Schema4 schema) async => await runSafe(
         }
 
         /// Drop columns from [GurabaSettingsTable]
-        await m.alterTable(TableMigration(schema.gurabaSettingsTable));
+        await m.alterTable(TableMigration(schema.mindfulSettingsTable));
 
         /// Drop [InvincibleModeTable]
         await m.deleteTable('invincible_mode_table');

@@ -45,6 +45,7 @@ Future<void> from2To3(Migrator m, Schema3 schema) async => await runSafe(
         }
 
         /// Drop excluded apps column from [GurabaSettingsTable]
+        // ignore: experimental_member_use
         await m.alterTable(TableMigration(schema.mindfulSettingsTable));
       },
     );

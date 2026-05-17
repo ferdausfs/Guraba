@@ -209,12 +209,15 @@ class _DropdownMenuDialogState<T> extends State<_DropdownMenuDialog<T>> {
                               ),
                               margin: index == 0 ? EdgeInsets.zero : null,
                               leading: IgnorePointer(
+                                // ignore: deprecated_member_use
                                 child: Radio(
                                   value: isSelected,
+                                  // ignore: deprecated_member_use
                                   groupValue: true,
                                   splashRadius: 0,
                                   materialTapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
+                                  // ignore: deprecated_member_use
                                   onChanged: (v) {},
                                 ),
                               ),

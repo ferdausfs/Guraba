@@ -10,10 +10,8 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 import androidx.core.net.toUri
 import com.guraba.app.R
-import com.guraba.app.guardian.GuardianModule
 import com.guraba.app.guardian.engine.TextMatch
 import com.guraba.app.guardian.GuardianModule
-import com.guraba.app.guardian.engine.TextMatch
 import com.guraba.app.models.Wellbeing
 import com.guraba.app.utils.NsfwDomains
 import com.guraba.app.utils.NsfwKeywords

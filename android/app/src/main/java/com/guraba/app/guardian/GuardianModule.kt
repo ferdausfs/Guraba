@@ -46,7 +46,6 @@ object GuardianModule {
     /** Long-running module scope (cancelled on process death). */
     val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    fun isInitialized(): Boolean = initialized
 
     @Synchronized
     fun isInitialized(): Boolean = initialized

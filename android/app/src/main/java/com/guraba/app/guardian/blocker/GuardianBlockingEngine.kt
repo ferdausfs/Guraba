@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.guraba.app.guardian.log.BlockEventLogger
+import com.guraba.app.guardian.log.BlockEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -63,11 +64,7 @@ object GuardianBlockingEngine {
 
         ioScope.launch {
             try {
-                logger.append(
-                    packageName = pkg,
-                    reason = reason.name,
-                    detail = finalDetail
-                )
+                logger.log(BlockEvent(timestamp = System.currentTimeMillis(), packageName = pkg, reason = reason.name, detail = finalDetail))
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to log block event", t)
             }

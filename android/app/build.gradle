@@ -1,4 +1,3 @@
-cat > ~/GurabaApp/android/app/build.gradle << 'EOF'
 plugins {
     id "com.android.application"
     id "kotlin-android"
@@ -7,9 +6,28 @@ plugins {
     id "com.google.devtools.ksp"
 }
 
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0'
+}
+
 android {
     namespace "com.mindful.android"
     compileSdkVersion flutter.compileSdkVersion
+    ndkVersion '27.0.12077973'
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -28,50 +46,62 @@ android {
         versionName flutterVersionName
     }
 
+    signingConfigs {
+        release {
+            if (System.getenv("KEYSTORE_FILE") != null) {
+                storeFile file(System.getenv("KEYSTORE_FILE"))
+                storePassword System.getenv("STORE_PASSWORD")
+                keyAlias System.getenv("KEY_ALIAS")
+                keyPassword System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
+        release {
+            ndk {
+                debugSymbolLevel 'full'
+            }
+            resValue "string", "app_name", "Mindful"
+            signingConfig signingConfigs.release
+        }
         debug {
             applicationIdSuffix ".debug"
+            resValue "string", "app_name", "Mindful Debug"
+            signingConfig System.getenv("KEYSTORE_FILE") != null ? signingConfigs.release : signingConfigs.debug
         }
-        release {
-            signingConfig signingConfigs.debug
-            minifyEnabled false
-            shrinkResources false
+        profile {
+            resValue "string", "app_name", "Mindful Profile"
+            signingConfig System.getenv("KEYSTORE_FILE") != null ? signingConfigs.release : signingConfigs.debug
         }
+    }
+    buildFeatures {
+        viewBinding true
     }
 }
 
 flutter {
-    source "../.."
+    source '../..'
 }
 
 dependencies {
     implementation 'androidx.work:work-runtime:2.10.1'
     implementation 'androidx.appcompat:appcompat:1.7.1'
 
-    // Hilt DI
     implementation "com.google.dagger:hilt-android:2.52"
     ksp "com.google.dagger:hilt-compiler:2.52"
 
-    // Room DB
     implementation "androidx.room:room-runtime:2.6.1"
     implementation "androidx.room:room-ktx:2.6.1"
     ksp "androidx.room:room-compiler:2.6.1"
 
-    // DataStore
     implementation "androidx.datastore:datastore-preferences:1.1.1"
-
-    // EncryptedSharedPreferences
     implementation "androidx.security:security-crypto:1.1.0-alpha06"
 
-    // TFLite
     implementation "org.tensorflow:tensorflow-lite:2.14.0"
     implementation "org.tensorflow:tensorflow-lite-gpu:2.14.0"
     implementation "org.tensorflow:tensorflow-lite-support:0.4.4"
 
-    // Coroutines
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0"
-
-    // Timber
     implementation "com.jakewharton.timber:timber:5.0.1"
 }
-EOF

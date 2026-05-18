@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="32dp"
+    android:background="#FF121212">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🛡️"
+        android:textSize="72sp"
+        android:gravity="center" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="ACCESS BLOCKED"
+        android:textColor="#FFFFFFFF"
+        android:textSize="26sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.05"
+        android:layout_marginTop="16dp"
+        android:gravity="center" />
+
+    <TextView
+        android:id="@+id/txtPackage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="App Name"
+        android:textColor="#FF888888"
+        android:textSize="14sp"
+        android:layout_marginTop="8dp"
+        android:gravity="center" />
+
+    <TextView
+        android:id="@+id/txtReason"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="Blocked by Guraba"
+        android:textColor="#FFAAAAAA"
+        android:textSize="15sp"
+        android:layout_marginTop="20dp"
+        android:lineSpacingMultiplier="1.4" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="STAY STRONG 💪"
+        android:textColor="#FF555555"
+        android:textSize="12sp"
+        android:layout_marginTop="24dp"
+        android:gravity="center" />
+
+    <Button
+        android:id="@+id/btnHome"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="GO HOME"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginTop="36dp"
+        android:backgroundTint="#FF6200EE"
+        android:textColor="#FFFFFFFF"
+        android:paddingTop="14dp"
+        android:paddingBottom="14dp" />
+
+    <Button
+        android:id="@+id/btnBack"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="GO BACK"
+        android:textSize="14sp"
+        android:layout_marginTop="12dp"
+        android:backgroundTint="#FF333333"
+        android:textColor="#FFAAAAAA"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp" />
+
+</LinearLayout>

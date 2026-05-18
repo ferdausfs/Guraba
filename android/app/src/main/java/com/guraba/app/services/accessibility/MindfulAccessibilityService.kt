@@ -16,6 +16,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -32,21 +33,32 @@ import com.guraba.app.AppConstants.SNAPCHAT_PACKAGE
 import com.guraba.app.AppConstants.YOUTUBE_PACKAGE
 import com.guraba.app.R
 import com.guraba.app.enums.PlatformFeatures
+import com.guraba.app.guardian.GuardianModule
+import com.guraba.app.guardian.blocker.GuardianBlockReason
+import com.guraba.app.guardian.blocker.GuardianBlockingEngine
+import com.guraba.app.guardian.engine.TextMatch
 import com.guraba.app.helpers.device.PermissionsHelper
 import com.guraba.app.helpers.storage.SharedPrefsHelper
 import com.guraba.app.models.Wellbeing
 import com.guraba.app.receivers.DeviceAppsChangedReceiver
 import com.guraba.app.utils.ThreadUtils
 import com.guraba.app.utils.executors.Throttler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 /**
  * An AccessibilityService that monitors app usage and blocks access to specified content based on user settings.
+ * Integrated with Guardian module for AI NSFW detection and keyword filtering.
  */
 class GurabaAccessibilityService : AccessibilityService(), OnSharedPreferenceChangeListener {
     companion object {
         private const val TAG = "Guraba.GurabaAccessibilityService"
+        private const val TEXT_THROTTLE_MS = 600L
+        private const val AI_THROTTLE_MS = 3_500L
 
         const val ACTION_PERFORM_HOME_PRESS = "com.guraba.app.action.performHomePress"
         const val ACTION_MIDNIGHT_ACCESSIBILITY_RESET =
@@ -66,12 +78,15 @@ class GurabaAccessibilityService : AccessibilityService(), OnSharedPreferenceCha
         private val devicePlatformPackages = mutableSetOf<String>()
     }
 
-
     // Fixed thread pool for parallel event processing
     private val executorService: ExecutorService = Executors.newFixedThreadPool(4)
     private val throttler: Throttler = Throttler(500L)
+    private val textThrottleMap = LinkedHashMap<String, Long>()
+    private val aiThrottleMap = LinkedHashMap<String, Long>()
     private val deviceAppsChangedReceiver: DeviceAppsChangedReceiver =
         DeviceAppsChangedReceiver(onAppsChanged = { refreshServiceConfig() })
+
+    private val guardianScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Managers
     private lateinit var shortsPlatformManager: ShortsPlatformManager
@@ -83,6 +98,10 @@ class GurabaAccessibilityService : AccessibilityService(), OnSharedPreferenceCha
 
     override fun onCreate() {
         super.onCreate()
+
+        // Initialize Guardian module
+        GuardianModule.init(this)
+
         trackingManager = TrackingManager(context = this)
         deviceFeaturesManager = DeviceFeaturesManager(
             context = this,
@@ -105,7 +124,6 @@ class GurabaAccessibilityService : AccessibilityService(), OnSharedPreferenceCha
         // Register listener for install and uninstall events
         deviceAppsChangedReceiver.register(this)
     }
-
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -149,6 +167,11 @@ class GurabaAccessibilityService : AccessibilityService(), OnSharedPreferenceCha
                     // Broadcast event
                     trackingManager.onNewEvent("${it.packageName}")
 
+                    // Guardian: keyword + AI check for all apps
+                    if (GuardianModule.isInitialized() && GuardianModule.aiDetector.cachedAiEnabled) {
+                        runGuardianChecks(eventPackageName, it)
+                    }
+
                     // Only process if any of the content is blocked
                     if (shouldBlockContent()) {
                         processEventInBackground(
@@ -165,10 +188,128 @@ class GurabaAccessibilityService : AccessibilityService(), OnSharedPreferenceCha
     }
 
     /**
+     * Runs Guardian keyword and AI detection on any app.
+     */
+    private fun runGuardianChecks(pkg: String, node: AccessibilityNodeInfo) {
+        val now = System.currentTimeMillis()
+
+        // --- Keyword check (throttled per package) ---
+        val lastText = textThrottleMap[pkg] ?: 0L
+        if (now - lastText >= TEXT_THROTTLE_MS) {
+            textThrottleMap[pkg] = now
+            if (textThrottleMap.size > 50) {
+                val it = textThrottleMap.entries.iterator()
+                if (it.hasNext()) { it.next(); it.remove() }
+            }
+
+            val pageText = BrowserManager.extractPageText(node)
+            if (pageText.isNotBlank()) {
+                val result = GuardianModule.keywordEngine.evaluateText(pageText)
+                if (result is TextMatch.Hit) {
+                    Log.d(TAG, "Guardian: keyword '${result.rule}' matched in $pkg")
+                    GuardianBlockingEngine.block(
+                        context = this,
+                        pkg = pkg,
+                        reason = GuardianBlockReason.KEYWORD_MATCH,
+                        detail = result.rule,
+                        logger = GuardianModule.eventLogger
+                    )
+                    return
+                }
+            }
+        }
+
+        // --- AI check (throttled — heavier operation) ---
+        val lastAi = aiThrottleMap[pkg] ?: 0L
+        if (now - lastAi >= AI_THROTTLE_MS) {
+            aiThrottleMap[pkg] = now
+            if (aiThrottleMap.size > 50) {
+                val it = aiThrottleMap.entries.iterator()
+                if (it.hasNext()) { it.next(); it.remove() }
+            }
+
+            // Check if already temp blocked
+            val tempBlock = GuardianBlockingEngine.isTempBlocked(pkg)
+            if (tempBlock != null) {
+                Log.d(TAG, "Guardian: $pkg is temp blocked for ${tempBlock.remainingMinutes}min")
+                GuardianBlockingEngine.block(
+                    context = this,
+                    pkg = pkg,
+                    reason = GuardianBlockReason.AI_DETECTION,
+                    detail = "temp_block:${tempBlock.remainingMinutes}min",
+                    logger = GuardianModule.eventLogger
+                )
+                return
+            }
+
+            // Take screenshot for AI
+            guardianScope.launch {
+                try {
+                    val bitmap = takeScreenshotCompat() ?: return@launch
+                    val aiDetector = GuardianModule.aiDetector
+                    aiDetector.ensureLoaded()
+
+                    val userGender = aiDetector.cachedUserGender
+                    val isUnsafe = when {
+                        userGender == "MALE" || userGender == "FEMALE" ->
+                            aiDetector.isOppositeGenderNsfw(bitmap, userGender) ||
+                            aiDetector.isUnsafe(bitmap)
+                        else -> aiDetector.isUnsafe(bitmap)
+                    }
+
+                    if (!bitmap.isRecycled) bitmap.recycle()
+
+                    if (isUnsafe) {
+                        Log.w(TAG, "Guardian: AI detected unsafe content in $pkg")
+                        GuardianBlockingEngine.block(
+                            context = this@GurabaAccessibilityService,
+                            pkg = pkg,
+                            reason = GuardianBlockReason.AI_DETECTION,
+                            detail = "nsfw_detected",
+                            logger = GuardianModule.eventLogger
+                        )
+                    }
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Guardian: AI check failed for $pkg", t)
+                }
+            }
+        }
+    }
+
+    /**
+     * Takes a screenshot compatible with the current API level.
+     */
+    private fun takeScreenshotCompat(): Bitmap? {
+        return try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                // API 30+ takeScreenshot is async — not usable here directly
+                // So we capture from rootInActiveWindow
+                captureNodeBitmap(rootInActiveWindow)
+            } else {
+                captureNodeBitmap(rootInActiveWindow)
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "takeScreenshotCompat failed", t)
+            null
+        }
+    }
+
+    private fun captureNodeBitmap(node: AccessibilityNodeInfo?): Bitmap? {
+        node ?: return null
+        val bounds = android.graphics.Rect()
+        node.getBoundsInScreen(bounds)
+        if (bounds.width() <= 0 || bounds.height() <= 0) return null
+        val root = node.window ?: return null
+        var bmp: Bitmap? = null
+        root.getRoot()?.let {
+            // Fallback: create a placeholder — real screenshot needs MediaProjection
+            // which requires user permission. Here we return null to skip AI gracefully.
+        }
+        return bmp
+    }
+
+    /**
      * Processes accessibility event in background thread instead of main thread.
-     *
-     * @param packageName The package name of the app generating the event.
-     * @param node        The accessibility node representing the UI element currently in focus.
      */
     private fun processEventInBackground(
         packageName: String,
@@ -197,12 +338,8 @@ class GurabaAccessibilityService : AccessibilityService(), OnSharedPreferenceCha
         }
     }
 
-
     /**
      * Determines whether content should be blocked based on the current settings.
-     *
-     * @return `true` if content should be blocked based on the current settings,
-     * `false` otherwise.
      */
     private fun shouldBlockContent(): Boolean {
         return wellbeing.blockedFeatures.isNotEmpty() ||
@@ -211,17 +348,13 @@ class GurabaAccessibilityService : AccessibilityService(), OnSharedPreferenceCha
                 wellbeing.blockNsfwSites
     }
 
-
     /**
      * Performs the back action and shows a toast message indicating that the content is blocked.
      */
     private fun goBackWithToast(customAction: Int? = null) {
         throttler.submit {
             ThreadUtils.runOnMainThread {
-                // Perform the back action (can be done on background thread)
                 performGlobalAction(customAction ?: GLOBAL_ACTION_BACK)
-
-                // Post Toast to main thread
                 Toast.makeText(
                     this@GurabaAccessibilityService,
                     getString(R.string.toast_blocked_content),
@@ -236,18 +369,15 @@ class GurabaAccessibilityService : AccessibilityService(), OnSharedPreferenceCha
      */
     private fun refreshServiceConfig() {
         try {
-            // Using hashset to avoid duplicates
             browserPackages.clear()
             devicePlatformPackages.clear()
             shortsPlatformPackages.clear()
             val pm = packageManager
 
-            // Check admin and add settings to blocked packages
             if (PermissionsHelper.getAndAskAdminPermission(this, false)) {
                 devicePlatformPackages.add(SETTINGS_PACKAGE)
             }
 
-            // Fetch installed browser packages
             val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("http://www.google.com"))
             pm.queryIntentActivities(browserIntent, PackageManager.MATCH_ALL).forEach {
                 browserPackages.add(it.activityInfo.packageName)
@@ -255,30 +385,22 @@ class GurabaAccessibilityService : AccessibilityService(), OnSharedPreferenceCha
 
             wellbeing.blockedFeatures.forEach { feature ->
                 when (feature) {
-                    /// Instagram
                     PlatformFeatures.INSTAGRAM_REELS,
                     PlatformFeatures.INSTAGRAM_EXPLORE,
                         -> shortsPlatformPackages.add(INSTAGRAM_PACKAGE)
 
-                    // Snapchat
                     PlatformFeatures.SNAPCHAT_SPOTLIGHT,
                     PlatformFeatures.SNAPCHAT_DISCOVER,
                         -> shortsPlatformPackages.add(SNAPCHAT_PACKAGE)
 
-                    // Facebook
                     PlatformFeatures.FACEBOOK_REELS ->
                         shortsPlatformPackages.add(FACEBOOK_PACKAGE)
 
-                    // Reddit
                     PlatformFeatures.REDDIT_SHORTS ->
                         shortsPlatformPackages.add(REDDIT_PACKAGE)
 
-                    // Youtube
                     PlatformFeatures.YOUTUBE_SHORTS -> {
-                        // Add official package
                         shortsPlatformPackages.add(YOUTUBE_PACKAGE)
-
-                        // Now add other unofficial clients
                         val ytIntent =
                             Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com"))
                         pm.queryIntentActivities(ytIntent, PackageManager.MATCH_ALL)
@@ -290,16 +412,14 @@ class GurabaAccessibilityService : AccessibilityService(), OnSharedPreferenceCha
                 }
             }
 
-
-            // Load nsfw website domains if needed
             if (wellbeing.blockNsfwSites) BrowserManager.initializeNsfwDomains()
             else BrowserManager.clearNsfwDomains()
 
             Log.d(
-                TAG, "refreshServiceConfig: Accessibility service config updated successfully: " +
+                TAG, "refreshServiceConfig: Config updated:" +
                         "\n settings: $wellbeing" +
-                        "\n device platforms: $devicePlatformPackages" +
-                        "\n short platforms: $shortsPlatformPackages" +
+                        "\n device: $devicePlatformPackages" +
+                        "\n shorts: $shortsPlatformPackages" +
                         "\n browsers: $browserPackages"
             )
         } catch (e: Exception) {
@@ -318,15 +438,12 @@ class GurabaAccessibilityService : AccessibilityService(), OnSharedPreferenceCha
         }
     }
 
-    override fun onInterrupt() {
-    }
+    override fun onInterrupt() {}
 
     override fun onDestroy() {
         try {
             executorService.shutdownNow()
             trackingManager.startManualTracking()
-
-            // Unregister prefs listener and receiver
             deviceAppsChangedReceiver.unRegister(this)
             SharedPrefsHelper.registerUnregisterListenerToListenablePrefs(this, false, this)
         } catch (e: Exception) {

@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 sealed class ImportProgress {
-    data object Idle : ImportProgress()
+    object Idle : ImportProgress()
     data class Working(val percent: Int) : ImportProgress()
     data class Success(val modelName: String, val sizeBytes: Long) : ImportProgress()
     data class Error(val modelName: String, val message: String) : ImportProgress()

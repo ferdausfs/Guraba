@@ -16,7 +16,7 @@ import java.io.File
 data class KeywordRule(val keyword: String, val isRegex: Boolean, val enabled: Boolean = true)
 
 sealed class TextMatch {
-    data object None : TextMatch()
+    object None : TextMatch()
     data class Hit(val rule: String) : TextMatch()
 }
 

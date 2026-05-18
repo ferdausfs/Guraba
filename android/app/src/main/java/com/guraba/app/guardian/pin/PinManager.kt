@@ -55,10 +55,10 @@ class PinManager(private val secure: SecureStorage) {
     }
 
     sealed class VerifyResult {
-        data object Success : VerifyResult()
+        object Success : VerifyResult()
         data class Wrong(val remainingAttempts: Int) : VerifyResult()
         data class LockedOut(val msRemaining: Long) : VerifyResult()
-        data object NotSet : VerifyResult()
+        object NotSet : VerifyResult()
     }
 
     companion object {

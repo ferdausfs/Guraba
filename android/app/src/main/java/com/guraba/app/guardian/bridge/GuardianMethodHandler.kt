@@ -55,12 +55,12 @@ class GuardianMethodHandler(
             // ─── AI prefs / thresholds ──────────────────────────
             "getAiSettings" -> result.success(
                 mapOf(
-                    "aiEnabled"        to GuardianModule.aiDetector.cachedAiEnabled,
-                    "userGender"       to GuardianModule.aiDetector.cachedUserGender,
-                    "aiThreshold"      to GuardianModule.aiDetector.cachedThreshold,
+                    "aiEnabled"         to GuardianModule.aiDetector.cachedAiEnabled,
+                    "userGender"        to GuardianModule.aiDetector.cachedUserGender,
+                    "aiThreshold"       to GuardianModule.aiDetector.cachedThreshold,
                     "nsfwGateThreshold" to GuardianModule.aiDetector.cachedNsfwGateThreshold,
-                    "genderThreshold"  to GuardianModule.aiDetector.cachedGenderThreshold,
-                    "gridVoteCount"    to GuardianModule.aiDetector.cachedGridVoteCount
+                    "genderThreshold"   to GuardianModule.aiDetector.cachedGenderThreshold,
+                    "gridVoteCount"     to GuardianModule.aiDetector.cachedGridVoteCount
                 )
             )
             "setAiEnabled"        -> setPref(call, "value", result) { GuardianModule.preferences.setAiDetection(it as Boolean) }

@@ -10,6 +10,8 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
 import androidx.core.net.toUri
 import com.guraba.app.R
+import com.guraba.app.guardian.GuardianModule
+import com.guraba.app.guardian.engine.TextMatch
 import com.guraba.app.models.Wellbeing
 import com.guraba.app.utils.NsfwDomains
 import com.guraba.app.utils.NsfwKeywords
@@ -49,6 +51,16 @@ class BrowserManager(
         val host = Utils.parseHostNameFromUrl(url) ?: return
 
         when {
+            // Guardian keyword detection
+            GuardianModule.isInitialized() && run {
+                val pageText = extractPageText(node)
+                pageText.isNotBlank() &&
+                    GuardianModule.keywordEngine.evaluateText(pageText) is TextMatch.Hit
+            } -> {
+                Log.d(TAG, "blockDistraction: Keyword matched in $packageName")
+                blockedContentGoBack.invoke()
+            }
+
             wellbeing.blockedWebsites.contains(host)
                     || wellbeing.nsfwWebsites.contains(host)
                     || nsfwDomains[host] ?: false
@@ -161,6 +173,24 @@ class BrowserManager(
 
         fun clearNsfwDomains() {
             nsfwDomains = mapOf()
+        }
+
+        /**
+         * Extracts visible text from the accessibility node tree (max 2000 chars).
+         */
+        fun extractPageText(node: AccessibilityNodeInfo): String {
+            val sb = StringBuilder()
+            fun traverse(n: AccessibilityNodeInfo?) {
+                n ?: return
+                n.text?.let { sb.append(it).append(" ") }
+                n.contentDescription?.let { sb.append(it).append(" ") }
+                for (i in 0 until n.childCount) {
+                    traverse(n.getChild(i))
+                    if (sb.length > 2000) return
+                }
+            }
+            traverse(node)
+            return sb.toString().take(2000)
         }
 
         /**

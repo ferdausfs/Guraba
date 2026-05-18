@@ -49,6 +49,9 @@ object GuardianModule {
     fun isInitialized(): Boolean = initialized
 
     @Synchronized
+    fun isInitialized(): Boolean = initialized
+
+    @Synchronized
     fun init(context: Context) {
         if (initialized) return
         val app = context.applicationContext

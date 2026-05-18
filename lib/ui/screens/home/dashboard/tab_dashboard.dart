@@ -49,7 +49,6 @@ class TabDashboard extends ConsumerWidget {
       child: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          /// Active session
           const SliverActiveSessionAlert(),
 
           MultiSliver(
@@ -61,18 +60,14 @@ class TabDashboard extends ConsumerWidget {
                 child: IntrinsicHeight(
                   child: Row(
                     children: [
-                      /// Screen time
                       const Expanded(child: ScreenTimeGlance()),
                       4.hBox,
-
-                      /// Data usage
                       const Expanded(child: FocusDailyGlance()),
                     ],
                   ),
                 ),
               ),
 
-              /// Usage glance
               DefaultExpandableListTile(
                 position: ItemPosition.mid,
                 titleText: context.locale.glance_tile_title,
@@ -84,7 +79,6 @@ class TabDashboard extends ConsumerWidget {
                 ),
               ),
 
-              /// Parental controls
               DefaultListTile(
                 position: ItemPosition.bottom,
                 leadingIcon: FluentIcons.shield_keyhole_20_regular,
@@ -96,10 +90,7 @@ class TabDashboard extends ConsumerWidget {
                     .pushNamed(AppRoutes.parentalControlsPath),
               ),
 
-              /// Restrictions
               ..._restrictions(context),
-
-              /// Productivity
               ..._productivity(context),
             ].animateListOnce(
               ref: ref,
@@ -110,9 +101,7 @@ class TabDashboard extends ConsumerWidget {
             ),
           ),
 
-          /// Tips and tricks
           const SliverTipsAndTricks(),
-
           const SliverTabsBottomPadding(),
         ],
       ),
@@ -120,12 +109,10 @@ class TabDashboard extends ConsumerWidget {
   }
 
   static List<Widget> _restrictions(BuildContext context) => [
-        /// Restrictions
         ContentSectionHeader(
           title: context.locale.restrictions_heading,
         ),
 
-        /// Apps blocking
         DefaultListTile(
           position: ItemPosition.top,
           leadingIcon: FluentIcons.app_title_20_regular,
@@ -136,7 +123,6 @@ class TabDashboard extends ConsumerWidget {
           ),
         ),
 
-        /// Grouped apps blocking
         DefaultListTile(
           position: ItemPosition.mid,
           leadingIcon: FluentIcons.app_recent_20_regular,
@@ -147,7 +133,6 @@ class TabDashboard extends ConsumerWidget {
               Navigator.of(context).pushNamed(AppRoutes.restrictionGroupsPath),
         ),
 
-        /// Shorts restrictions
         DefaultListTile(
           position: ItemPosition.mid,
           leadingIcon: FluentIcons.resize_video_20_regular,
@@ -158,9 +143,8 @@ class TabDashboard extends ConsumerWidget {
               Navigator.of(context).pushNamed(AppRoutes.shortsBlockingPath),
         ),
 
-        /// Website restrictions
         DefaultListTile(
-          position: ItemPosition.middle,
+          position: ItemPosition.mid,
           leadingIcon: FluentIcons.earth_20_regular,
           titleText: context.locale.websites_blocking_tab_title,
           subtitleText: context.locale.websites_blocking_tile_subtitle,
@@ -169,7 +153,6 @@ class TabDashboard extends ConsumerWidget {
               Navigator.of(context).pushNamed(AppRoutes.websitesBlockingPath),
         ),
 
-        /// Guardian Shield
         DefaultListTile(
           position: ItemPosition.bottom,
           leadingIcon: FluentIcons.shield_20_regular,
@@ -182,10 +165,8 @@ class TabDashboard extends ConsumerWidget {
       ];
 
   static List<Widget> _productivity(BuildContext context) => [
-        /// Productivity
         const ContentSectionHeader(title: "Productivity"),
 
-        /// Habits
         DefaultListTile(
           position: ItemPosition.top,
           leadingIcon: FluentIcons.drink_coffee_20_regular,
@@ -198,7 +179,6 @@ class TabDashboard extends ConsumerWidget {
           ),
         ),
 
-        /// Tasks and todos
         DefaultListTile(
           position: ItemPosition.mid,
           leadingIcon: FluentIcons.reading_list_20_regular,
@@ -211,7 +191,6 @@ class TabDashboard extends ConsumerWidget {
           ),
         ),
 
-        /// Notes & lists
         DefaultListTile(
           position: ItemPosition.bottom,
           leadingIcon: FluentIcons.note_20_regular,

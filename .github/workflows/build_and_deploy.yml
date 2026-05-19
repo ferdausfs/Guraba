@@ -12,16 +12,20 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          distribution: "zulu"
+          distribution: "temurin"
           java-version: "17"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.2'
+          channel: 'stable'
+
       - run: flutter --version
 
       - name: Reconstruct Keystore File
@@ -50,6 +54,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
       - name: Build AAB
         run: flutter build appbundle --release
 
@@ -59,17 +66,15 @@ jobs:
         with:
           packageName: ${{ secrets.PACKAGE_NAME }}
           serviceAccountJsonPlainText: ${{ secrets.SERVICE_ACCOUNT_JSON }}
-          inAppUpdatePriority: ${{ secrets.UPDATE_PRIORITY }} # Between 0-5 => Higher the number, higher the priority.
+          inAppUpdatePriority: ${{ secrets.UPDATE_PRIORITY }}
           releaseFiles: build/app/outputs/bundle/release/app-release.aab
           track: internal
           status: draft
-          changesNotSentForReview: ${{ secrets.DONT_SEND_CHANGES_FOR_REVIEW }}  # true or false
-          # mappingFile: build/app/outputs/mapping/release/mapping.txt
-          # debugSymbols: build\app\intermediates\merged_native_libs\release\mergeReleaseNativeLibs\out\lib
+          changesNotSentForReview: ${{ secrets.DONT_SEND_CHANGES_FOR_REVIEW }}
 
       - name: Cleanup
         run: |
-          echo "Cleaning up temporary files..."
+          echo "Cleaning up..."
           rm -rf build
           rm $HOME/keystore.jks
-          echo "Cleanup complete."
+          echo "Done."

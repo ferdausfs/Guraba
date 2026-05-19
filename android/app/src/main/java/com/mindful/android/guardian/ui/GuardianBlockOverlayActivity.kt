@@ -1,10 +1,10 @@
 package com.mindful.android.guardian.ui
 
-import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 import com.mindful.android.R
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -14,7 +14,7 @@ import dagger.hilt.android.AndroidEntryPoint
  * without adding new layout files (the activity draws its own view).
  */
 @AndroidEntryPoint
-class GuardianBlockOverlayActivity : Activity() {
+class GuardianBlockOverlayActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
